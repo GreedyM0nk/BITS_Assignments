@@ -2,6 +2,7 @@ import math
 from typing import Optional
 
 import torch
+import torch.nn.functional as F
 from torch import nn
 
 
@@ -22,8 +23,8 @@ class MyRNNCell(nn.Module):
 
     def forward(self, x, h):
         return torch.tanh(
-            torch.nn.functional.linear(x, self.weight_ih, self.bias_ih)
-            + torch.nn.functional.linear(h, self.weight_hh, self.bias_hh)
+            F.linear(x, self.weight_ih, self.bias_ih)
+            + F.linear(h, self.weight_hh, self.bias_hh)
         )
 
 
@@ -44,9 +45,10 @@ class MyLSTMCell(nn.Module):
 
     def forward(self, x, state):
         h, c = state
+        # x, h and c are [batch, hidden/input]; each gate chunk is [batch, hidden].
         gates = (
-            torch.nn.functional.linear(x, self.weight_ih, self.bias_ih)
-            + torch.nn.functional.linear(h, self.weight_hh, self.bias_hh)
+            F.linear(x, self.weight_ih, self.bias_ih)
+            + F.linear(h, self.weight_hh, self.bias_hh)
         )
         i, f, g, o = gates.chunk(4, dim=-1)
         i, f, o = i.sigmoid(), f.sigmoid(), o.sigmoid()
@@ -108,6 +110,7 @@ class RecurrentRegressor(nn.Module):
 
 
 def scaled_dot_product_attention(q, k, v, mask=None):
+    # q/k/v are [batch, heads, query/key positions, head width].
     scores = q @ k.transpose(-2, -1) / math.sqrt(q.size(-1))
     if mask is not None:
         scores = scores.masked_fill(~mask.bool(), torch.finfo(scores.dtype).min)
@@ -147,6 +150,8 @@ class MyMultiHeadAttention(nn.Module):
         k = self.k_proj(x).view(shape).transpose(1, 2)
         v = self.v_proj(x).view(shape).transpose(1, 2)
         out, weights = scaled_dot_product_attention(q, k, v, mask)
+        if self.training and self.dropout:
+            out = F.dropout(out, p=self.dropout)
         out = out.transpose(1, 2).contiguous().view(batch, steps, self.width)
         result = self.out_proj(out)
         return (result, weights) if return_weights else result
@@ -173,26 +178,79 @@ class EncoderBlock(nn.Module):
 class CausalTransformerLM(nn.Module):
     def __init__(self, vocab_size, width=128, heads=4, layers=4, max_len=512):
         super().__init__()
+        self.context_length = max_len
         self.embedding = nn.Embedding(vocab_size, width)
         self.position = SinusoidalEncoding(width, max_len)
         self.blocks = nn.ModuleList([EncoderBlock(width, heads) for _ in range(layers)])
         self.norm = nn.LayerNorm(width)
         self.lm_head = nn.Linear(width, vocab_size)
 
-    def forward(self, tokens):
+    def forward(self, tokens, causal=True):
         steps = tokens.size(1)
-        causal = torch.tril(torch.ones(steps, steps, device=tokens.device, dtype=torch.bool))
+        mask = torch.tril(torch.ones(steps, steps, device=tokens.device, dtype=torch.bool)) if causal else None
         x = self.position(self.embedding(tokens))
         for block in self.blocks:
-            x = block(x, causal)
+            x = block(x, mask)
         return self.lm_head(self.norm(x))
 
     @torch.no_grad()
     def generate(self, tokens, length, temperature=0.8, top_k=20):
         for _ in range(length):
-            logits = self(tokens[:, -self.position.pe.size(1):])[:, -1] / temperature
+            logits = self(tokens[:, -self.context_length:])[:, -1] / temperature
             values, indices = logits.topk(min(top_k, logits.size(-1)))
             probs = torch.softmax(values, dim=-1)
             next_token = indices.gather(-1, torch.multinomial(probs, 1))
             tokens = torch.cat([tokens, next_token], dim=1)
         return tokens
+
+
+def recurrent_parameter_counts(input_size=9, hidden_size=64):
+    return {
+        "RNN": hidden_size * input_size + hidden_size * hidden_size + hidden_size,
+        "LSTM": 4 * (hidden_size * input_size + hidden_size * hidden_size + hidden_size),
+        "GRU": 3 * (hidden_size * input_size + hidden_size * hidden_size + hidden_size),
+    }
+
+
+def recurrent_parameter_explanation(input_size=9, hidden_size=64):
+    counts = recurrent_parameter_counts(input_size, hidden_size)
+    return {
+        "equation_counts": counts,
+        "pytorch_counts": {
+            "RNN": counts["RNN"] + hidden_size,
+            "LSTM": counts["LSTM"] + 4 * hidden_size,
+            "GRU": counts["GRU"] + 3 * hidden_size,
+        },
+        "text": "The equation count combines input weights, recurrent weights, and one bias per unit. "
+        "PyTorch stores separate input-hidden and hidden-hidden biases, adding hidden_size per "
+        "RNN unit and one extra gate-vector per gated cell.",
+    }
+
+
+class HARTransformerClassifier(nn.Module):
+    def __init__(self, input_size=9, classes=6, width=128, heads=4, layers=2,
+                 positional="sinusoidal", patch_size=1, max_len=128):
+        super().__init__()
+        self.positional = positional
+        self.patch_size = patch_size
+        self.input_projection = nn.Linear(input_size * patch_size, width)
+        self.cls = nn.Parameter(torch.zeros(1, 1, width))
+        self.position = SinusoidalEncoding(width, max_len + 1)
+        self.learned_position = nn.Parameter(torch.zeros(1, max_len + 1, width))
+        self.blocks = nn.ModuleList([EncoderBlock(width, heads) for _ in range(layers)])
+        self.norm = nn.LayerNorm(width)
+        self.head = nn.Linear(width, classes)
+
+    def forward(self, x):
+        if self.patch_size > 1:
+            steps = x.size(1) // self.patch_size
+            x = x[:, :steps * self.patch_size].reshape(x.size(0), steps, -1)
+        x = self.input_projection(x)
+        x = torch.cat([self.cls.expand(x.size(0), -1, -1), x], dim=1)
+        if self.positional == "sinusoidal":
+            x = self.position(x)
+        elif self.positional == "learned":
+            x = x + self.learned_position[:, :x.size(1)]
+        for block in self.blocks:
+            x = block(x)
+        return self.head(self.norm(x[:, 0]))

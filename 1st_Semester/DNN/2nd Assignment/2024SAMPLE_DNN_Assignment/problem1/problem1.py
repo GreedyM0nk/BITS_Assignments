@@ -61,6 +61,9 @@ def run_har(fast=FAST_MODE):
     all_results = []
     for seed in SETTINGS.seeds:
         train_loader, valid_loader, test_loader = har_loaders(seed)
+        if seed == SETTINGS.seeds[0]:
+            arrays = load_har(ROOT / "data", seed)
+            plot_class_balance(arrays[1], FIGURES_1 / "p1_class_balance.png")
         for kind in ("RNN", "LSTM", "GRU"):
             result = train_classifier(
                 RecurrentClassifier(9, hidden, 6, kind),
@@ -84,6 +87,100 @@ def run_har(fast=FAST_MODE):
     return all_results
 
 
+def gradient_profile(model, x, y, device_name, before_training=True):
+    model = model.to(device_name)
+    model.eval()
+    x, y = x.to(device_name), y.to(device_name)
+    x.requires_grad_(True)
+    prediction = model(x)
+    loss = torch.nn.functional.mse_loss(prediction, y)
+    loss.backward()
+    norms = x.grad.detach().norm(dim=-1).mean(0).cpu().numpy()
+    return norms
+
+
+def run_gradient_study(fast=FAST_MODE):
+    n = 64 if fast else 256
+    x, y = make_adding(n, 100, SETTINGS.seeds[0])
+    profiles = {}
+    for kind in ("RNN", "LSTM", "GRU"):
+        model = RecurrentRegressor(2, SETTINGS.hidden_size, kind)
+        before = gradient_profile(model, torch.from_numpy(x), torch.from_numpy(y), device())
+        loaders = tuple(loaders_from_arrays(*pair) for pair in (
+            make_adding(512 if fast else 10000, 100, 0),
+            make_adding(128 if fast else 1000, 100, 1),
+            make_adding(128 if fast else 1000, 100, 2),
+        ))
+        trained = train_regressor(model, *loaders, 1 if fast else SETTINGS.epochs,
+                                  SETTINGS.lr, device(), SETTINGS.seeds[0])
+        after = gradient_profile(model, torch.from_numpy(x), torch.from_numpy(y), device())
+        profiles[kind] = (before, after)
+    FIGURES_1.mkdir(parents=True, exist_ok=True)
+    plt.figure(figsize=(7, 4))
+    for kind, (before, after) in profiles.items():
+        plt.plot(np.arange(100), before, "--", label=f"{kind} before")
+        plt.plot(np.arange(100), after, label=f"{kind} after")
+    plt.yscale("log")
+    plt.xlabel("Time step")
+    plt.ylabel(r"$||\partial L / \partial x_t||$")
+    plt.title("Figure 3. Gradient norm before and after training")
+    plt.legend(ncol=2)
+    plt.tight_layout()
+    plt.savefig(FIGURES_1 / "p1_gradient_norms.png", dpi=160)
+    plt.close()
+    return profiles
+
+
+def run_hidden_size_sweep(fast=FAST_MODE):
+    sizes = (16, 32) if fast else (16, 32, 64, 128)
+    train, valid, test = har_loaders(SETTINGS.seeds[0])
+    rows = []
+    for size in sizes:
+        for kind in ("LSTM", "GRU"):
+            result = train_classifier(
+                RecurrentClassifier(9, size, 6, kind), train, valid, test,
+                1 if fast else SETTINGS.epochs, SETTINGS.lr, device(), SETTINGS.seeds[0],
+            )
+            rows.append((size, kind, result["accuracy"], result["params"]))
+    frame = np.array([(size, acc) for size, _, acc, _ in rows])
+    plt.figure(figsize=(6, 4))
+    for kind in ("LSTM", "GRU"):
+        subset = [(s, a) for s, k, a, _ in rows if k == kind]
+        plt.plot([x[0] for x in subset], [x[1] for x in subset], marker="o", label=kind)
+    plt.xlabel("Hidden size")
+    plt.ylabel("HAR test accuracy")
+    plt.title("Figure 4. Hidden-size sweep")
+    plt.legend()
+    plt.tight_layout()
+    FIGURES_1.mkdir(parents=True, exist_ok=True)
+    plt.savefig(FIGURES_1 / "p1_hidden_size_sweep.png", dpi=160)
+    plt.close()
+    return rows
+
+
+def run_clipping_ablation(fast=FAST_MODE):
+    loaders = build_adding_loaders(200, fast=fast)
+    rows = []
+    for clipping in (None, 1.0):
+        result = train_regressor(
+            RecurrentRegressor(2, SETTINGS.hidden_size, "RNN"), *loaders,
+            1 if fast else SETTINGS.epochs, SETTINGS.lr, device(),
+            SETTINGS.seeds[0], clip=clipping,
+        )
+        rows.append((clipping or "none", result["test_mse"]))
+    plt.figure(figsize=(5, 3))
+    plt.bar([str(x[0]) for x in rows], [x[1] for x in rows])
+    plt.axhline(0.167, color="red", linestyle="--", label="constant baseline")
+    plt.ylabel("Test MSE")
+    plt.title("Figure 5. RNN gradient-clipping ablation at T=200")
+    plt.legend()
+    plt.tight_layout()
+    FIGURES_1.mkdir(parents=True, exist_ok=True)
+    plt.savefig(FIGURES_1 / "p1_clipping_ablation.png", dpi=160)
+    plt.close()
+    return rows
+
+
 def run_adding(fast=FAST_MODE):
     lengths = (50, 100) if fast else (50, 100, 200, 400)
     epochs = 2 if fast else SETTINGS.epochs
@@ -103,6 +200,28 @@ def run_adding(fast=FAST_MODE):
                     "notes": f"baseline=0.167;solved={result['test_mse'] < 0.05}",
                 })
                 rows.append((T, kind, seed, result))
+    FIGURES_1.mkdir(parents=True, exist_ok=True)
+    plt.figure(figsize=(7, 4))
+    for kind in ("RNN", "LSTM", "GRU"):
+        points = [(T, result["test_mse"]) for T, k, _, result in rows if k == kind]
+        plt.plot([p[0] for p in points], [p[1] for p in points], marker="o", label=kind)
+    plt.axhline(0.167, color="red", linestyle="--", label="constant baseline")
+    plt.axhline(0.05, color="green", linestyle=":", label="solved threshold")
+    plt.xlabel("Sequence length")
+    plt.ylabel("Test MSE")
+    plt.title("Figure 6. Adding-problem MSE against sequence length")
+    plt.legend()
+    plt.tight_layout()
+    plt.savefig(FIGURES_1 / "p1_mse_vs_length.png", dpi=160)
+    plt.close()
+    solved = {}
+    for T, kind, _, result in rows:
+        solved.setdefault((kind, T), 0)
+        solved[(kind, T)] += int(result["test_mse"] < 0.05)
+    with (ROOT / "problem1" / "adding_solved_runs.csv").open("w", encoding="utf-8") as handle:
+        handle.write("model,seq_len,solved_runs,total_runs\n")
+        for (kind, T), count in sorted(solved.items()):
+            handle.write(f"{kind},{T},{count},3\n")
     return rows
 
 

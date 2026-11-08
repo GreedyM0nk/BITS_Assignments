@@ -11,7 +11,10 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 from src.config import FIGURES_2, RESULTS, SETTINGS
 from src.data import character_data, download_shakespeare, load_har, loaders_from_arrays
-from src.models import CausalTransformerLM, EncoderBlock, MyMultiHeadAttention, scaled_dot_product_attention
+from src.models import (
+    CausalTransformerLM, EncoderBlock, HARTransformerClassifier,
+    MyMultiHeadAttention, scaled_dot_product_attention,
+)
 from src.reproducibility import device, seed_everything
 from src.results import append_result
 from src.training import count_parameters
@@ -23,6 +26,9 @@ def hand_check_attention():
     assert torch.allclose(weights.sum(-1), torch.ones(1, 3), atol=1e-6)
     reference = torch.nn.functional.scaled_dot_product_attention(q, q, q)
     assert torch.allclose(out, reference, atol=1e-5)
+    causal = torch.tril(torch.ones(3, 3, dtype=torch.bool))
+    _, causal_weights = scaled_dot_product_attention(q, q, q, causal)
+    assert torch.equal(causal_weights.masked_select(~causal), torch.zeros(3))
     return out, weights
 
 
@@ -39,10 +45,92 @@ def plot_hand_check(path):
     plt.close()
 
 
+def run_har_transformer(fast=True):
+    arrays = load_har(ROOT / "data", SETTINGS.seeds[0])
+    x_train, y_train, x_valid, y_valid, x_test, y_test = arrays[:6]
+    loaders = (
+        loaders_from_arrays(x_train, y_train),
+        loaders_from_arrays(x_valid, y_valid, shuffle=False),
+        loaders_from_arrays(x_test, y_test, shuffle=False),
+    )
+    results = []
+    for positional in ("none", "sinusoidal", "learned"):
+        model = HARTransformerClassifier(positional=positional)
+        optimizer = torch.optim.Adam(model.parameters(), lr=SETTINGS.lr)
+        criterion = torch.nn.CrossEntropyLoss()
+        model.to(device())
+        epochs = 1 if fast else SETTINGS.epochs
+        for _ in range(epochs):
+            model.train()
+            for x, y in loaders[0]:
+                optimizer.zero_grad(set_to_none=True)
+                loss = criterion(model(x.to(device())), y.to(device()))
+                loss.backward()
+                optimizer.step()
+        model.eval()
+        truth, predictions = [], []
+        with torch.no_grad():
+            for x, y in loaders[2]:
+                predictions.extend(model(x.to(device())).argmax(-1).cpu().tolist())
+                truth.extend(y.tolist())
+        accuracy = sum(a == b for a, b in zip(truth, predictions)) / len(truth)
+        append_result(RESULTS, {
+            "problem": "P2-HAR", "model": f"Transformer-{positional}",
+            "seed": SETTINGS.seeds[0], "test_acc": accuracy,
+            "params": count_parameters(model), "notes": "CLS;positional ablation",
+        })
+        results.append((positional, accuracy, count_parameters(model)))
+    return results
+
+
+def plot_attention_heatmaps(model, tokens, path):
+    model.eval()
+    x = model.embedding(tokens)
+    x = model.position(x)
+    _, weights = model.blocks[0](x, return_weights=True)
+    FIGURES_2.mkdir(parents=True, exist_ok=True)
+    fig, axes = plt.subplots(1, 2, figsize=(8, 3))
+    for index, axis in enumerate(axes):
+        axis.imshow(weights[0, index].detach().cpu(), cmap="magma")
+        axis.set_title(f"Head {index + 1}")
+        axis.set_xlabel("key position")
+        axis.set_ylabel("query position")
+    fig.suptitle("Figure 3. Transformer attention heads")
+    fig.tight_layout()
+    fig.savefig(path, dpi=160)
+    plt.close(fig)
+
+
+def run_transformer_ablations(fast=True):
+    widths = (1, 4) if fast else (1, 4, 8)
+    rows = []
+    for heads in widths:
+        model = CausalTransformerLM(65, SETTINGS.transformer_dim, heads, 1, 128)
+        tokens = torch.randint(0, 65, (2, 128), device=device())
+        start = torch.cuda.Event(enable_timing=True) if torch.cuda.is_available() else None
+        if start:
+            end = torch.cuda.Event(enable_timing=True)
+            start.record()
+            model(tokens)
+            end.record()
+            torch.cuda.synchronize()
+            elapsed = start.elapsed_time(end) / 1000
+        else:
+            import time
+            begin = time.perf_counter()
+            model(tokens)
+            elapsed = time.perf_counter() - begin
+        rows.append((heads, elapsed, count_parameters(model)))
+    with (ROOT / "problem2" / "transformer_ablations.csv").open("w", encoding="utf-8") as handle:
+        handle.write("heads,seconds,params\n")
+        handle.writelines(f"{h},{seconds},{params}\n" for h, seconds, params in rows)
+    return rows
+
+
 def train_language_model(fast=True):
     text = download_shakespeare(ROOT / "data")
     context = 64 if fast else SETTINGS.context
-    train_set, valid_set, chars, encode = character_data(text, context)
+    train_set, valid_set, chars, encode = character_data(text, context, stride=context // 2)
     batch = 32 if fast else SETTINGS.batch_size
     model = CausalTransformerLM(len(chars), SETTINGS.transformer_dim, SETTINGS.heads,
                                 2 if fast else SETTINGS.layers, context).to(device())
@@ -61,12 +149,14 @@ def train_language_model(fast=True):
             optimizer.step()
         model.eval()
         with torch.no_grad():
-            losses = []
+            loss_total, token_total = 0.0, 0
             for x, y in valid_loader:
                 x, y = x.to(device()), y.to(device())
-                losses.append(torch.nn.functional.cross_entropy(
-                    model(x).reshape(-1, len(chars)), y.reshape(-1)).item())
-        history.append(sum(losses) / len(losses))
+                token_count = y.numel()
+                loss_total += torch.nn.functional.cross_entropy(
+                    model(x).reshape(-1, len(chars)), y.reshape(-1), reduction="sum").item()
+                token_total += token_count
+        history.append(loss_total / token_total)
     val_loss = history[-1]
     append_result(RESULTS, {
         "problem": "P2-LM", "model": "CausalTransformer", "seed": SETTINGS.seeds[0],

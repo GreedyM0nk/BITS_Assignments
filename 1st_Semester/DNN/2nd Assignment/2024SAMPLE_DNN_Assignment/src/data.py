@@ -90,7 +90,7 @@ def download_shakespeare(data_dir: Path) -> str:
     return path.read_text(encoding="utf-8")
 
 
-def character_data(text: str, context: int = 128):
+def character_data(text: str, context: int = 128, stride: int | None = None):
     chars = sorted(set(text))
     encode = {c: i for i, c in enumerate(chars)}
     values = np.array([encode[c] for c in text], dtype=np.int64)
@@ -98,9 +98,10 @@ def character_data(text: str, context: int = 128):
     train, valid = values[:split], values[split:]
 
     def windows(array):
-        count = len(array) - context
-        x = np.stack([array[i:i + context] for i in range(count)])
-        y = np.stack([array[i + 1:i + context + 1] for i in range(count)])
+        step = stride or context
+        starts = range(0, len(array) - context, step)
+        x = np.stack([array[i:i + context] for i in starts])
+        y = np.stack([array[i + 1:i + context + 1] for i in starts])
         return TensorDataset(torch.from_numpy(x), torch.from_numpy(y))
 
     return windows(train), windows(valid), chars, encode

@@ -19,9 +19,11 @@ configuration. The first run downloads UCI HAR and Tiny Shakespeare into
 `data/`. The data directory, checkpoints, and virtual environment are excluded
 from the submission zip.
 
-The full configuration is intended for a T4 GPU. Every completed run appends
-to `results.csv`, so an interrupted session can be resumed. The generated
-samples are written to `problem2/generated_samples.txt`.
+The full configuration is intended for a T4 GPU and should be budgeted as a
+multi-hour reproducibility run because it includes repeated seeds and
+ablations. Every completed run appends to `results.csv`, so an interrupted
+session can be resumed. The generated samples are written to
+`problem2/generated_samples.txt`.
 
 ## Reproducibility and assumptions
 
