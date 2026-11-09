@@ -197,7 +197,7 @@ def run_adding(fast=FAST_MODE):
                     "problem": "P1-adding", "model": kind, "seed": seed,
                     "seq_len": T, "test_mse": result["test_mse"],
                     "params": result["params"], "sec_per_epoch": result["sec_per_epoch"],
-                    "notes": f"baseline=0.167;solved={result['test_mse'] < 0.05}",
+                    "notes": f"mode={'fast' if fast else 'full'};baseline=0.167;solved={result['test_mse'] < 0.05}",
                 })
                 rows.append((T, kind, seed, result))
     FIGURES_1.mkdir(parents=True, exist_ok=True)

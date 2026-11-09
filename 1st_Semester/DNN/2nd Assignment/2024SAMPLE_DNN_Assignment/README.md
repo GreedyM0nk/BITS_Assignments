@@ -1,8 +1,11 @@
 # DNN Programming Assignment 2
 
-This sample uses the documented fallback variant because no student ID or
-individualisation table was supplied: hidden size `64`, Transformer width
-`128`, seeds `42, 43, 44`, and the even-ID gradient-clipping ablation.
+Student: **Souvik Dutta**
+Student ID: **2026AJ05991**
+
+This sample uses the documented fallback variant because no individualisation
+table was supplied: hidden size `64`, Transformer width `128`, seeds
+`42, 43, 44`, and the even-ID gradient-clipping ablation.
 
 ## Environment and run order
 
@@ -34,4 +37,5 @@ instructor variant is later provided.
 
 The report must be completed from the generated tables and figures. The
 assignment's academic-integrity requirement is preserved in the report's
-AI-use statement.
+AI-use statement. The current repository contains verified smoke evidence; full
+benchmark outputs must be generated on a T4 before submission.

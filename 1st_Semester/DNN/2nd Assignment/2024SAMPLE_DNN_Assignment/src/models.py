@@ -227,6 +227,22 @@ def recurrent_parameter_explanation(input_size=9, hidden_size=64):
     }
 
 
+def encoder_block_parameter_breakdown(width=128, ff_width=None):
+    ff_width = ff_width or 4 * width
+    weights_only = 4 * width * width + 2 * width * ff_width
+    biases = 4 * width + ff_width + width
+    layer_norm = 4 * width
+    return {
+        "width": width,
+        "ff_width": ff_width,
+        "weights_only": weights_only,
+        "biases": biases,
+        "layer_norm": layer_norm,
+        "total": weights_only + biases + layer_norm,
+        "formula": "4d^2 + 2*d*d_ff",
+    }
+
+
 class HARTransformerClassifier(nn.Module):
     def __init__(self, input_size=9, classes=6, width=128, heads=4, layers=2,
                  positional="sinusoidal", patch_size=1, max_len=128):

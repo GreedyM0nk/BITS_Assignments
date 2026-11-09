@@ -2,7 +2,7 @@ import torch
 
 from src.models import (
     MyGRUCell, MyLSTMCell, MyRNNCell, recurrent_parameter_counts,
-    scaled_dot_product_attention,
+    encoder_block_parameter_breakdown, scaled_dot_product_attention,
 )
 
 
@@ -53,8 +53,48 @@ def test_custom_cells_match_library_over_sequence():
                 assert torch.allclose(custom_h, library_h, atol=1e-5)
 
 
+def test_custom_cells_match_framework_sequence_layers():
+    torch.manual_seed(19)
+    batch, steps, d, h = 2, 5, 9, 8
+    sequence = torch.randn(batch, steps, d)
+    for custom_class, layer_class in (
+        (MyRNNCell, torch.nn.RNN),
+        (MyLSTMCell, torch.nn.LSTM),
+        (MyGRUCell, torch.nn.GRU),
+    ):
+        custom = custom_class(d, h)
+        layer = layer_class(d, h, batch_first=True)
+        custom.load_state_dict({
+            "weight_ih": layer.weight_ih_l0.detach().clone(),
+            "weight_hh": layer.weight_hh_l0.detach().clone(),
+            "bias_ih": layer.bias_ih_l0.detach().clone(),
+            "bias_hh": layer.bias_hh_l0.detach().clone(),
+        })
+        hidden = torch.zeros(batch, h)
+        cell = torch.zeros(batch, h)
+        custom_outputs = []
+        for step in range(steps):
+            if isinstance(custom, MyLSTMCell):
+                hidden, cell = custom(sequence[:, step], (hidden, cell))
+            else:
+                hidden = custom(sequence[:, step], hidden)
+            custom_outputs.append(hidden)
+        custom_outputs = torch.stack(custom_outputs, dim=1)
+        if isinstance(custom, MyLSTMCell):
+            library_outputs, (library_hidden, library_cell) = layer(
+                sequence, (torch.zeros(1, batch, h), torch.zeros(1, batch, h))
+            )
+            assert torch.allclose(cell, library_cell[-1], atol=1e-5)
+        else:
+            library_outputs, library_hidden = layer(sequence, torch.zeros(1, batch, h))
+        assert torch.allclose(custom_outputs, library_outputs, atol=1e-5)
+        assert torch.allclose(hidden, library_hidden[-1], atol=1e-5)
+
+
 def test_parameter_derivations():
     assert recurrent_parameter_counts() == {"RNN": 4736, "LSTM": 18944, "GRU": 14208}
+    breakdown = encoder_block_parameter_breakdown()
+    assert breakdown["weights_only"] == 196608
 
 
 def test_attention_rows_and_causality():

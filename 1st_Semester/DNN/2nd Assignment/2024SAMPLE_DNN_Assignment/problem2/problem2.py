@@ -28,8 +28,20 @@ def hand_check_attention():
     assert torch.allclose(out, reference, atol=1e-5)
     causal = torch.tril(torch.ones(3, 3, dtype=torch.bool))
     _, causal_weights = scaled_dot_product_attention(q, q, q, causal)
-    assert torch.equal(causal_weights.masked_select(~causal), torch.zeros(3))
+    assert torch.equal(
+        causal_weights.masked_select(~causal),
+        torch.zeros_like(causal_weights.masked_select(~causal)),
+    )
     return out, weights
+
+
+def hand_attention_table():
+    """Return the hand-computed 3-token scores, weights, and output."""
+    q = torch.tensor([[1.0, 0.0], [0.0, 1.0], [1.0, 1.0]])
+    scores = q @ q.T / math.sqrt(2.0)
+    weights = torch.softmax(scores, dim=-1)
+    output = weights @ q
+    return scores, weights, output
 
 
 def plot_hand_check(path):
@@ -127,6 +139,31 @@ def run_transformer_ablations(fast=True):
     return rows
 
 
+def run_mask_and_context_ablation(fast=True):
+    contexts = (64, 128) if fast else (64, 128, 256, 512)
+    rows = []
+    import time
+    for context in contexts:
+        model = CausalTransformerLM(65, SETTINGS.transformer_dim, SETTINGS.heads, 1, context)
+        tokens = torch.randint(0, 65, (2, context), device=device())
+        if torch.cuda.is_available():
+            torch.cuda.reset_peak_memory_stats()
+        started = time.perf_counter()
+        causal_logits = model(tokens, causal=True)
+        causal_seconds = time.perf_counter() - started
+        started = time.perf_counter()
+        unmasked_logits = model(tokens, causal=False)
+        unmasked_seconds = time.perf_counter() - started
+        peak_memory = torch.cuda.max_memory_allocated() if torch.cuda.is_available() else 0
+        rows.append((context, causal_seconds, unmasked_seconds, peak_memory,
+                     float(causal_logits.mean().detach()),
+                     float(unmasked_logits.mean().detach())))
+    with (ROOT / "problem2" / "context_ablation.csv").open("w", encoding="utf-8") as handle:
+        handle.write("context,causal_seconds,unmasked_seconds,peak_memory,causal_mean,unmasked_mean\n")
+        handle.writelines(",".join(map(str, row)) + "\n" for row in rows)
+    return rows
+
+
 def train_language_model(fast=True):
     text = download_shakespeare(ROOT / "data")
     context = 64 if fast else SETTINGS.context
@@ -182,7 +219,7 @@ def generate_samples(model, chars, encode, path):
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", encoding="utf-8") as handle:
         for temperature in (0.2, 0.8, 1.5):
-            sample = model.generate(start, 500, temperature=temperature, top_k=20)[0]
+            sample = model.generate(start, 500, temperature=temperature, top_k=20)[0][1:]
             handle.write(f"Temperature {temperature}\n")
             handle.write("".join(inverse[int(i)] for i in sample.cpu()) + "\n\n")
 

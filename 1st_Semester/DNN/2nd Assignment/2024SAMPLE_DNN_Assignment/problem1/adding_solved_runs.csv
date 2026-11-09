@@ -1,0 +1,7 @@
+model,seq_len,solved_runs,total_runs
+GRU,50,0,3
+GRU,100,0,3
+LSTM,50,0,3
+LSTM,100,0,3
+RNN,50,0,3
+RNN,100,0,3
