@@ -89,7 +89,8 @@ def run_har(fast=FAST_MODE):
 
 def gradient_profile(model, x, y, device_name, before_training=True):
     model = model.to(device_name)
-    model.eval()
+    # cuDNN RNN backward requires training mode; no optimizer step occurs here.
+    model.train()
     x, y = x.to(device_name), y.to(device_name)
     x.requires_grad_(True)
     prediction = model(x)
