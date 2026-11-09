@@ -10,6 +10,11 @@ figure reference.
 **DNN Programming Assignment 2 - RNN, LSTM, GRU and Transformer**  
 Name: **Souvik Dutta**  Student ID: **2026AJ05991**
 
+Chosen configuration: `h=64`, `d=128`, heads `=4`, seeds `42, 43, 44`.
+The individual `T=200` ablation is vanilla-RNN gradient clipping at norm 1.0
+versus no clipping. These are deliberate choices under the instructor's
+clarification that the variants table and ID lookup are withdrawn.
+
 ## Problem 1
 
 Current repository evidence status: the adding-problem fast CPU matrix and
@@ -33,7 +38,9 @@ generated in the repository. The language-model run did not finish within the
 available CPU run window; therefore `generated_samples.txt` remains explicitly
 labelled as pending rather than containing fabricated text.
 
-Include the hand-checkable attention example, unit-test assertions, parameter
+Include the chosen `Q`, `K`, and `V` matrices, the hand-computed scaled
+dot-product scores/softmax/output, and the matching code output. Include the
+hand-checkable attention example, unit-test assertions, parameter
 derivation, encoder-block details and HAR positional-encoding comparison.
 Report the Tiny Shakespeare learning curve, validation loss and bits per
 character, then discuss the three generated temperatures. Include two

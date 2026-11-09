@@ -22,12 +22,14 @@ from src.training import count_parameters
 
 def hand_check_attention():
     q = torch.tensor([[[1.0, 0.0], [0.0, 1.0], [1.0, 1.0]]])
-    out, weights = scaled_dot_product_attention(q, q, q)
+    k = torch.tensor([[[1.0, 1.0], [1.0, 0.0], [0.0, 1.0]]])
+    v = torch.tensor([[[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]]])
+    out, weights = scaled_dot_product_attention(q, k, v)
     assert torch.allclose(weights.sum(-1), torch.ones(1, 3), atol=1e-6)
-    reference = torch.nn.functional.scaled_dot_product_attention(q, q, q)
+    reference = torch.nn.functional.scaled_dot_product_attention(q, k, v)
     assert torch.allclose(out, reference, atol=1e-5)
     causal = torch.tril(torch.ones(3, 3, dtype=torch.bool))
-    _, causal_weights = scaled_dot_product_attention(q, q, q, causal)
+    _, causal_weights = scaled_dot_product_attention(q, k, v, causal)
     assert torch.equal(
         causal_weights.masked_select(~causal),
         torch.zeros_like(causal_weights.masked_select(~causal)),
@@ -36,12 +38,14 @@ def hand_check_attention():
 
 
 def hand_attention_table():
-    """Return the hand-computed 3-token scores, weights, and output."""
+    """Return hand-computed scores, weights, and output for explicit Q/K/V."""
     q = torch.tensor([[1.0, 0.0], [0.0, 1.0], [1.0, 1.0]])
-    scores = q @ q.T / math.sqrt(2.0)
+    k = torch.tensor([[1.0, 1.0], [1.0, 0.0], [0.0, 1.0]])
+    v = torch.tensor([[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]])
+    scores = q @ k.T / math.sqrt(2.0)
     weights = torch.softmax(scores, dim=-1)
-    output = weights @ q
-    return scores, weights, output
+    output = weights @ v
+    return q, k, v, scores, weights, output
 
 
 def plot_hand_check(path):

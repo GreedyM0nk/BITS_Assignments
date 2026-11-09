@@ -3,9 +3,11 @@
 Student: **Souvik Dutta**
 Student ID: **2026AJ05991**
 
-This sample uses the documented fallback variant because no individualisation
-table was supplied: hidden size `64`, Transformer width `128`, seeds
-`42, 43, 44`, and the even-ID gradient-clipping ablation.
+Chosen configuration (per the instructor clarification): Problem 1 hidden size
+`h=64`, Problem 2 model width `d=128` with 4 heads, and seeds `42, 43, 44`.
+The individual ablation is gradient clipping for the vanilla RNN at `T=200`;
+this choice is used because the variants table and its ID-based instruction
+were explicitly withdrawn.
 
 ## Environment and run order
 
@@ -31,9 +33,9 @@ session can be resumed. The generated samples are written to
 ## Reproducibility and assumptions
 
 All Python, NumPy and PyTorch seeds are fixed. HAR validation is subject-wise
-and statistics are fit on the training subjects only. The sample defaults above
-replace the missing variant table; change them in `src/config.py` if an
-instructor variant is later provided.
+and statistics are fit on the training subjects only. The selected values are
+declared here and in the report title block, and must be retained when
+reproducing the results.
 
 The report must be completed from the generated tables and figures. The
 assignment's academic-integrity requirement is preserved in the report's
