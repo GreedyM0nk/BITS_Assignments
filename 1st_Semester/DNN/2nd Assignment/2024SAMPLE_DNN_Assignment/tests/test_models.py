@@ -1,4 +1,5 @@
 import torch
+from unittest.mock import patch
 
 from src.models import (
     MyGRUCell, MyLSTMCell, MyRNNCell, recurrent_parameter_counts,
@@ -105,3 +106,11 @@ def test_attention_rows_and_causality():
     mask = torch.tril(torch.ones(3, 3, dtype=torch.bool))
     _, causal_weights = scaled_dot_product_attention(q, q, q, mask)
     assert torch.equal(causal_weights.masked_select(~mask), torch.zeros_like(causal_weights.masked_select(~mask)))
+
+
+def test_transformer_ablation_model_and_tokens_share_device():
+    from problem2 import problem2
+
+    with patch.object(problem2, "device", return_value=torch.device("cpu")):
+        rows = problem2.run_transformer_ablations(True)
+    assert len(rows) == 2

@@ -121,7 +121,9 @@ def run_transformer_ablations(fast=True):
     widths = (1, 4) if fast else (1, 4, 8)
     rows = []
     for heads in widths:
-        model = CausalTransformerLM(65, SETTINGS.transformer_dim, heads, 1, 128)
+        model = CausalTransformerLM(
+            65, SETTINGS.transformer_dim, heads, 1, 128
+        ).to(device())
         tokens = torch.randint(0, 65, (2, 128), device=device())
         start = torch.cuda.Event(enable_timing=True) if torch.cuda.is_available() else None
         if start:
@@ -148,7 +150,9 @@ def run_mask_and_context_ablation(fast=True):
     rows = []
     import time
     for context in contexts:
-        model = CausalTransformerLM(65, SETTINGS.transformer_dim, SETTINGS.heads, 1, context)
+        model = CausalTransformerLM(
+            65, SETTINGS.transformer_dim, SETTINGS.heads, 1, context
+        ).to(device())
         tokens = torch.randint(0, 65, (2, context), device=device())
         if torch.cuda.is_available():
             torch.cuda.reset_peak_memory_stats()
