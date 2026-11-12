@@ -5,6 +5,7 @@ from pathlib import Path
 
 import matplotlib.pyplot as plt
 import torch
+from sklearn.metrics import f1_score
 from torch.utils.data import DataLoader
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -91,17 +92,18 @@ def run_har_transformer(fast=True):
                     predictions.extend(model(x.to(device())).argmax(-1).cpu().tolist())
                     truth.extend(y.tolist())
             accuracy = sum(a == b for a, b in zip(truth, predictions)) / len(truth)
+            macro_f1 = f1_score(truth, predictions, average="macro")
             append_result(RESULTS, {
                 "problem": "P2-HAR", "model": f"Transformer-{positional}",
-                "seed": seed, "test_acc": accuracy,
+                "seed": seed, "test_acc": accuracy, "macro_f1": macro_f1,
                 "params": count_parameters(model), "notes": "CLS;positional ablation",
             })
-            results.append((positional, seed, accuracy, count_parameters(model)))
+            results.append((positional, seed, accuracy, macro_f1, count_parameters(model)))
     with (ROOT / "problem2" / "transformer_har_results.csv").open("w", encoding="utf-8") as handle:
         handle.write("positional,seed,test_accuracy,params\n")
         handle.writelines(
             f"{positional},{seed},{accuracy},{params}\n"
-            for positional, seed, accuracy, params in results
+            for positional, seed, accuracy, _, params in results
         )
     return results
 
