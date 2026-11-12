@@ -37,8 +37,9 @@ ablations. Run the cells separately, in this order:
    cell.
 
 The experiment functions write their CSVs and figures into the assignment
-folder. If a cell is interrupted, inspect the existing files before rerunning
-it so that duplicate rows are not mistaken for independent seeds. The
+folder. Each experiment clears only its own prior rows before starting and
+appends each completed run immediately, so an interrupted cell can be rerun
+without creating duplicate result rows for unrelated experiments. The
 generated samples are written to `problem2/generated_samples.txt`.
 
 ## Reproducibility and assumptions

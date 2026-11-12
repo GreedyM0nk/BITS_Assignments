@@ -16,7 +16,7 @@ from src.models import (
     MyMultiHeadAttention, scaled_dot_product_attention,
 )
 from src.reproducibility import device, seed_everything
-from src.results import append_result
+from src.results import append_result, clear_results
 from src.training import count_parameters
 
 
@@ -62,6 +62,7 @@ def plot_hand_check(path):
 
 
 def run_har_transformer(fast=True):
+    clear_results(RESULTS, {"P2-HAR"})
     results = []
     for seed in SETTINGS.seeds:
         arrays = load_har(ROOT / "data", seed)
@@ -190,6 +191,7 @@ def run_mask_and_context_ablation(fast=True):
 
 
 def train_language_model(fast=True):
+    clear_results(RESULTS, {"P2-LM"})
     text = download_shakespeare(ROOT / "data")
     context = 64 if fast else SETTINGS.context
     train_set, valid_set, chars, encode = character_data(text, context, stride=context // 2)

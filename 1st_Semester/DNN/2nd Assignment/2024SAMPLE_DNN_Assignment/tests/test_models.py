@@ -1,10 +1,12 @@
 import torch
 from unittest.mock import patch
+from pathlib import Path
 
 from src.models import (
     MyGRUCell, MyLSTMCell, MyRNNCell, recurrent_parameter_counts,
     encoder_block_parameter_breakdown, scaled_dot_product_attention,
 )
+from src.results import append_result, clear_results, load_results
 
 
 def copy_cell_weights(custom, reference):
@@ -114,3 +116,14 @@ def test_transformer_ablation_model_and_tokens_share_device():
     with patch.object(problem2, "device", return_value=torch.device("cpu")):
         rows = problem2.run_transformer_ablations(True)
     assert len(rows) == 2
+
+
+def test_clear_results_removes_only_selected_problem(tmp_path: Path):
+    path = tmp_path / "results.csv"
+    append_result(path, {"problem": "P1-HAR", "model": "RNN", "seed": 42})
+    append_result(path, {"problem": "P2-LM", "model": "LM", "seed": 42})
+
+    clear_results(path, {"P1-HAR"})
+
+    frame = load_results(path)
+    assert frame["problem"].tolist() == ["P2-LM"]

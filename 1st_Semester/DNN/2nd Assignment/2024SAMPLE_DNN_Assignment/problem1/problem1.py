@@ -18,7 +18,7 @@ from src.config import FIGURES_1, RESULTS, SETTINGS
 from src.data import loaders_from_arrays, load_har, make_adding, validate_adding
 from src.models import RecurrentClassifier, RecurrentRegressor
 from src.reproducibility import device, seed_everything
-from src.results import append_result
+from src.results import append_result, clear_results
 from src.training import train_classifier, train_regressor
 
 
@@ -56,6 +56,7 @@ def plot_class_balance(y, path):
 
 
 def run_har(fast=FAST_MODE):
+    clear_results(RESULTS, {"P1-HAR"})
     epochs = 2 if fast else SETTINGS.epochs
     hidden = SETTINGS.hidden_size
     all_results = []
@@ -203,6 +204,7 @@ def run_clipping_ablation(fast=FAST_MODE):
 
 
 def run_adding(fast=FAST_MODE):
+    clear_results(RESULTS, {"P1-adding"})
     lengths = (50, 100) if fast else (50, 100, 200, 400)
     epochs = 2 if fast else SETTINGS.epochs
     rows = []

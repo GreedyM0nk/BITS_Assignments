@@ -6,6 +6,18 @@ import pandas as pd
 from .config import RESULT_COLUMNS
 
 
+def clear_results(path: Path, problems: set[str]) -> None:
+    """Remove prior rows for experiments that are about to be rerun."""
+    if not path.exists():
+        return
+    frame = load_results(path)
+    remaining = frame.loc[~frame["problem"].isin(problems)]
+    if remaining.empty:
+        path.unlink()
+    else:
+        remaining.to_csv(path, index=False)
+
+
 def append_result(path: Path, row: dict[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     frame = pd.DataFrame([{column: row.get(column, "") for column in RESULT_COLUMNS}])
