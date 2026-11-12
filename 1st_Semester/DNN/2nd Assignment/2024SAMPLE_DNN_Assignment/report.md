@@ -69,9 +69,16 @@ K = [[1,1], [1,0], [0,1]]
 V = [[1,2], [3,4], [5,6]]
 ```
 
-The code output is
+For `a=1/sqrt(2)=0.707107`, the score matrix is
+`[[a,a,0],[a,0,a],[2a,a,a]]`. Thus the first-row weights are
+`[exp(a), exp(a), 1] / [2exp(a)+1] = [0.4011, 0.4011, 0.1978]`,
+the second-row weights are
+`[exp(a), 1, exp(a)] / [2exp(a)+1] = [0.4011, 0.1978, 0.4011]`,
+and the third-row weights are
+`[exp(2a), exp(a), exp(a)] / [exp(2a)+2exp(a)]`.
+Multiplying each weight row by V gives
 `[[2.593327,3.593327],[3.000000,4.000000],[2.489531,3.489531]]`,
-matching the hand calculation and PyTorch's scaled-dot-product attention.
+matching the code and PyTorch's scaled-dot-product attention.
 The causal test verifies exact zero probability above the diagonal.
 
 ### Transformer HAR
@@ -95,11 +102,23 @@ samples at temperatures 0.2, 0.8 and 1.5 are saved in
 are in `problem2/figures`.
 
 The head-count study compared 1, 4 and 8 heads at fixed width; parameter
-count remained 215,233 because the projected width was unchanged. The
-context study measured causal and unmasked forward passes for contexts
-64, 128, 256 and 512 and recorded peak CUDA memory. The observed growth is
-consistent with the `O(n^2 d)` attention score/memory term. Unmasked
-attention is treated only as an ablation, never as a valid causal LM.
+count remained 215,233 because it uses one Transformer block, whereas the
+four-block language model has 810,049 parameters. The encoder-block
+derivation is `4d² + 2*d*d_ff`; for `d=128`, `d_ff=512`, the weight-only
+term is 196,608, and the notebook compares the complete analytic total with
+`sum(p.numel())`.
+
+The context study measured causal versus unmasked passes at contexts 64, 128,
+256 and 512. The T4 results were respectively:
+`(0.001488, 0.001084, 18.93 MB)`,
+`(0.001327, 0.001055, 20.14 MB)`,
+`(0.001474, 0.001166, 24.37 MB)`, and
+`(0.001569, 0.001551, 39.25 MB)` for causal time, unmasked time and peak
+memory. The increase is consistent with the `O(n²d)` attention score/memory
+term. Unmasked attention is treated only as an ablation, never as a valid
+causal language model. The heatmap shows local diagonal attention in one head
+and broader earlier-token attention in the other; future positions remain
+masked.
 
 ## 3. Reproducibility and AI-use statement
 

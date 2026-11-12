@@ -203,6 +203,32 @@ def run_clipping_ablation(fast=FAST_MODE):
     return rows
 
 
+def run_forget_bias_ablation(fast=FAST_MODE):
+    """Compare LSTM forget-gate initialisation at T=200.
+
+    This is kept separate from the selected clipping ablation because the
+    instructor clarification withdrew ID-derived variants.
+    """
+    rows = []
+    for seed in SETTINGS.seeds:
+        loaders = build_adding_loaders(200, fast=fast)
+        for forget_bias in (0.0, 1.0):
+            model = RecurrentRegressor(2, SETTINGS.hidden_size, "LSTM")
+            with torch.no_grad():
+                hidden = SETTINGS.hidden_size
+                model.rnn.bias_ih_l0[hidden:2 * hidden].fill_(forget_bias)
+                model.rnn.bias_hh_l0[hidden:2 * hidden].zero_()
+            result = train_regressor(
+                model, *loaders, 1 if fast else SETTINGS.epochs, SETTINGS.lr,
+                device(), seed, clip=1.0,
+            )
+            rows.append((forget_bias, seed, result["test_mse"]))
+    with (ROOT / "problem1" / "forget_bias_ablation.csv").open("w", encoding="utf-8") as handle:
+        handle.write("forget_bias,seed,test_mse\n")
+        handle.writelines(f"{bias},{seed},{mse}\n" for bias, seed, mse in rows)
+    return rows
+
+
 def run_adding(fast=FAST_MODE):
     clear_results(RESULTS, {"P1-adding"})
     lengths = (50, 100) if fast else (50, 100, 200, 400)
@@ -237,6 +263,23 @@ def run_adding(fast=FAST_MODE):
     plt.tight_layout()
     plt.savefig(FIGURES_1 / "p1_mse_vs_length.png", dpi=160)
     plt.close()
+    t200 = [row for row in rows if row[0] == 200 and row[2] == SETTINGS.seeds[0]]
+    if t200:
+        fig, axes = plt.subplots(1, 2, figsize=(10, 4))
+        for T, kind, _, result in t200:
+            history = np.asarray(result["history"])
+            axes[0].plot(history[:, 0], label=kind)
+            axes[1].plot(history[:, 1], label=kind)
+        axes[0].set_title("Figure 7. T=200 training curves")
+        axes[0].set_xlabel("Epoch")
+        axes[0].set_ylabel("Training MSE")
+        axes[1].set_xlabel("Epoch")
+        axes[1].set_ylabel("Validation MSE")
+        for axis in axes:
+            axis.legend()
+        fig.tight_layout()
+        fig.savefig(FIGURES_1 / "p1_adding_T200_learning_curves.png", dpi=160)
+        plt.close(fig)
     solved = {}
     for T, kind, _, result in rows:
         solved.setdefault((kind, T), 0)

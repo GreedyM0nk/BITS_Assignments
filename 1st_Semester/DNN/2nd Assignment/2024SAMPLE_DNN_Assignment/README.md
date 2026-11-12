@@ -17,16 +17,19 @@ python -m pip install torch --index-url https://download.pytorch.org/whl/cu121  
 jupyter notebook
 ```
 
-Open `problem1/problem1.ipynb` and `problem2/problem2.ipynb`, then use
-**Kernel > Restart Kernel and Run All**. Both notebooks use only relative paths.
+Open the assignment folder as the working directory, open
+`problem1/problem1.ipynb` and `problem2/problem2.ipynb`, then use
+**Kernel > Restart Kernel and Run All**. Both notebooks use paths relative to
+the assignment folder; no `/content` path is required inside the notebooks.
 Set `FAST_MODE = True` for a smoke run; set it to `False` for the rubric
 configuration. The first run downloads UCI HAR and Tiny Shakespeare into
 `data/`. The data directory, checkpoints, and virtual environment are excluded
 from the submission zip.
 
-The full configuration is intended for a T4 GPU and should be budgeted as a
-multi-hour reproducibility run because it includes repeated seeds and
-ablations. Run the cells separately, in this order:
+The full configuration is intended for a T4 GPU. The notebooks print elapsed
+seconds for every experiment cell and assert the expected run count; record
+the sum of those printed values as the exact runtime in the report. Run the
+cells separately, in this order:
 
 1. Problem 1: `run_smoke()`, `run_har(False)`, `run_adding(False)`,
    `run_gradient_study(False)`, `run_hidden_size_sweep(False)`, and
@@ -40,7 +43,16 @@ The experiment functions write their CSVs and figures into the assignment
 folder. Each experiment clears only its own prior rows before starting and
 appends each completed run immediately, so an interrupted cell can be rerun
 without creating duplicate result rows for unrelated experiments. The
-generated samples are written to `problem2/generated_samples.txt`.
+generated samples are written to `problem2/generated_samples.txt`. The adding
+runner also writes `problem1/figures/p1_adding_T200_learning_curves.png`.
+
+The head-ablation parameter count is intentionally lower than the language
+model count: it uses one encoder block (`layers=1`) while the language model
+uses four blocks (`layers=4`). At fixed width, changing the head count does
+not change the projection parameter count. For one block, the encoder weight
+derivation is `4d^2 + 2*d*d_ff`; with `d=128` and `d_ff=512`, this is
+`196,608` weights before biases, LayerNorm parameters, embeddings and the
+output head.
 
 ## Reproducibility and assumptions
 
