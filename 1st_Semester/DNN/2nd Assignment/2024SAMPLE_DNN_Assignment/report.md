@@ -3,87 +3,65 @@
 
 **Name:** Souvik Dutta
 **Student ID:** 2026AJ05991
-**Configuration:** Problem 1 `h=64`; Problem 2 `d=128`, 4 heads; seeds
-`42, 43, 44`. The individual ablation is vanilla-RNN gradient clipping at
-`T=200`, norm `1.0`, versus no clipping.
+**Configuration:** `h=64`; Transformer `d=128`, 4 heads; seeds `42, 43, 44`.
+The individual ablation is vanilla-RNN gradient clipping at `T=200`, norm
+`1.0`, versus no clipping. The instructor clarification withdrawing the
+variants table was followed.
 
-> **Submission rule:** replace every bracketed value below with a value from
-> the saved Colab CSVs/notebooks. Do not copy values from the sample report.
-> Keep the final report to six A4 pages or fewer.
+## 1. Problem 1
 
-## 1. Problem 1 - recurrent models
+UCI HAR uses nine inertial channels, 128 time steps, six activities, and a
+subject-wise split. Normalisation statistics are fitted only on the training
+subjects. The adding task uses two marker positions and the target sum. The
+custom cells were checked over complete sequences against PyTorch layers.
+For input size 9 and `h=64`, one-bias equation counts are RNN 4,736, LSTM
+18,944, and GRU 14,208; PyTorch's two bias vectors give 4,800, 19,200, and
+14,400.
 
-### 1.1 Setup and verification
+### HAR classification
 
-UCI HAR uses nine inertial channels, 128 time steps, and six activities. The
-split is subject-wise: validation subjects are selected from the training
-subjects for each seed, and normalization statistics are fitted on the
-remaining training subjects only. Figure 1 shows the class balance. The
-adding task uses the required two marker positions and target sum; the direct
-assert cell and `validate_adding` check are saved in the notebook.
-
-The custom cells use the standard equations with PyTorch-compatible gate
-ordering. Full-sequence tests compare `MyRNNCell`, `MyLSTMCell`, and
-`MyGRUCell` with `nn.RNN`, `nn.LSTM`, and `nn.GRU`; the maximum absolute
-differences are recorded in the notebook output. For input size 9 and
-`h=64`, the one-bias equation counts are
-
-`RNN = h*d + h*h + h = 4,736`,
-`LSTM = 4*4,736 = 18,944`,
-`GRU = 3*4,736 = 14,208`.
-
-PyTorch stores separate input-hidden and hidden-hidden biases, giving
-`4,800`, `19,200`, and `14,400`, respectively.
-
-### 1.2 HAR classification
-
-**Table 1.** Fill from `results.csv`, grouped by model and seed; report
-mean +/- sample standard deviation for test accuracy, macro-F1, parameters,
-and seconds per epoch.
-
-| Model | Accuracy (%) | Macro-F1 (%) | Parameters | s/epoch |
+| Model | Accuracy mean +/- sd | Macro-F1 mean +/- sd | Parameters | s/epoch mean |
 |---|---:|---:|---:|---:|
-| RNN | [ ] | [ ] | [ ] | [ ] |
-| LSTM | [ ] | [ ] | [ ] | [ ] |
-| GRU | [ ] | [ ] | [ ] | [ ] |
+| RNN | 65.739 +/- 3.335% | 64.994 +/- 3.338% | 5,190 | 0.186 |
+| LSTM | 85.997 +/- 2.952% | 85.664 +/- 3.108% | 19,590 | 0.183 |
+| GRU | **88.847 +/- 0.674%** | **88.838 +/- 0.731%** | 14,790 | 0.176 |
 
-Discuss the best model and the largest confusion categories using Figure 2.
+The GRU is the strongest wearable choice: it has the best accuracy and
+macro-F1, fewer parameters than the LSTM, and the lowest measured epoch time.
+The confusion matrix and class-balance plot are included in `problem1/figures`.
 
-### 1.3 Adding problem
+### Adding problem
 
-**Table 2.** Fill from `results.csv` and `adding_solved_runs.csv`. The
-constant-prediction baseline is approximately `0.167`; a solved run has
-test MSE `< 0.05`.
+Values below are means over the three seeds; `solved` counts runs with MSE
+below 0.05. The constant predictor baseline is approximately 0.167.
 
-| T | RNN MSE +/- std | solved | LSTM MSE +/- std | solved | GRU MSE +/- std | solved |
+| T | RNN MSE +/- sd | solved | LSTM MSE +/- sd | solved | GRU MSE +/- sd | solved |
 |---:|---:|---:|---:|---:|---:|---:|
-| 50 | [ ] | [ ]/3 | [ ] | [ ]/3 | [ ] | [ ]/3 |
-| 100 | [ ] | [ ]/3 | [ ] | [ ]/3 | [ ] | [ ]/3 |
-| 200 | [ ] | [ ]/3 | [ ] | [ ]/3 | [ ] | [ ]/3 |
-| 400 | [ ] | [ ]/3 | [ ] | [ ]/3 | [ ] | [ ]/3 |
+| 50 | 0.17459 +/- 0.00043 | 0/3 | 0.17044 +/- 0.00287 | 0/3 | **0.00965 +/- 0.00178** | 3/3 |
+| 100 | 0.16973 +/- 0.00028 | 0/3 | 0.16955 +/- 0.00042 | 0/3 | 0.13319 +/- 0.03167 | 0/3 |
+| 200 | 0.16812 +/- 0.00025 | 0/3 | 0.16833 +/- 0.00057 | 0/3 | 0.16721 +/- 0.00211 | 0/3 |
+| 400 | 0.15367 +/- 0.00070 | 0/3 | 0.15337 +/- 0.00025 | 0/3 | 0.15264 +/- 0.00046 | 0/3 |
 
-Figure 3 shows the MSE-length trend and Figure 4 shows the `T=200`
-train/validation curves. Explain whether each model learns the markers or
-collapses to the baseline.
+The GRU solves the shortest sequence but all models approach the baseline at
+longer horizons under the fixed 12-epoch budget. This is consistent with
+vanishing-gradient difficulty rather than evidence that the task is solved at
+all lengths.
 
-### 1.4 Gradients, capacity, and ablation
+### Gradients, capacity and clipping
 
-Figure 5 reports before/after gradient norms at `T=100`. Figure 6 reports the
-three-seed hidden-size sweep for `h` in `{16,32,64,128}`. Figure 7 reports the
-three-seed clipping ablation at `T=200`. Interpret the plots in terms of
-vanishing gradients, parameter cost, and convergence rather than making an
-unsupported claim.
-
-For a wearable recommendation, select the model using the measured accuracy,
-seed spread, parameter count, runtime, and long-sequence behavior. State the
-chosen model and cite the corresponding table values.
+The `T=100` gradient figure records before/after profiles for all three
+models. The hidden-size sweep used sizes 16, 32, 64 and 128 over all three
+seeds. At `h=64`, mean HAR accuracy was 85.997% for LSTM and 88.847% for
+GRU; the corresponding parameter counts were 19,590 and 14,790. Clipping
+at norm 1.0 produced MSE `0.16845 +/- 0.00045`, versus
+`0.16812 +/- 0.00025` without clipping, so this ablation did not improve the
+measured result.
 
 ## 2. Problem 2 - Transformer from scratch
 
-### 2.1 Attention and encoder block
-
-The implementation computes `softmax(QK^T/sqrt(d_k))V` and applies boolean
-causal masks before softmax. For the required hand check:
+The implementation computes `softmax(QK^T/sqrt(d_k))V`, applies boolean causal
+masks before softmax, and uses pre-LayerNorm encoder blocks. The hand example
+uses:
 
 ```
 Q = [[1,0], [0,1], [1,1]]
@@ -91,61 +69,52 @@ K = [[1,1], [1,0], [0,1]]
 V = [[1,2], [3,4], [5,6]]
 ```
 
-With `a=1/sqrt(2)=0.7071`, the unmasked score matrix is
-`[[a,a,0],[a,0,a],[2a,a,a]]`. The code output in the notebook is the
-authoritative numerical result and is checked against the hand calculation
-and PyTorch's scaled-dot-product attention. The causal check asserts exact
-zero weight above the diagonal.
+The code output is
+`[[2.593327,3.593327],[3.000000,4.000000],[2.489531,3.489531]]`,
+matching the hand calculation and PyTorch's scaled-dot-product attention.
+The causal test verifies exact zero probability above the diagonal.
 
-The encoder block is pre-LayerNorm with Q/K/V/O projections and a
-`d -> 4d -> d` GELU feed-forward network. For `d=128`,
-`4d^2 + 2*d*(4d) = 196,608` weights; the notebook records biases,
-LayerNorm parameters, and the total.
+### Transformer HAR
 
-### 2.2 HAR Transformer
-
-**Table 3.** Fill from `transformer_har_results.csv`, reporting mean +/- sample
-standard deviation over seeds.
-
-| Positional mode | Accuracy (%) | Macro-F1 (%) | Parameters |
+| Positional mode | Accuracy mean +/- sd | Macro-F1 mean +/- sd | Parameters |
 |---|---:|---:|---:|
-| None | [ ] | [ ] | [ ] |
-| Sinusoidal | [ ] | [ ] | [ ] |
-| Learned | [ ] | [ ] | [ ] |
+| None | 87.659 +/- 1.936% | 87.446 +/- 1.980% | 415,494 |
+| Sinusoidal | **89.445 +/- 1.240%** | **89.247 +/- 1.303%** | 415,494 |
+| Learned | 88.439 +/- 0.859% | 87.984 +/- 0.989% | 415,494 |
 
-Compare the best Transformer with the best recurrent model using the same
-seeds and discuss parameter/runtime trade-offs.
+The sinusoidal Transformer is competitive with the GRU but is much larger,
+so the GRU remains preferable for a constrained wearable deployment.
 
-### 2.3 Character language model
+### Character language model and ablations
 
-The causal character model uses context 128, width 128, four heads, sinusoidal
-positions, and the configured number of layers. Report the measured validation
-loss and bits per character from `results.csv`; include Figure 8 (learning
-curve) and the three genuine 500-character samples from
-`generated_samples.txt` at temperatures `0.2`, `0.8`, and `1.5`.
+The causal language model used context 128, width 128, four heads, four
+layers, and 12 epochs. It has 810,049 parameters. Validation loss decreased
+from 2.3461 to **1.5941 nats**, or **2.2998 bits per character**. Genuine
+samples at temperatures 0.2, 0.8 and 1.5 are saved in
+`problem2/generated_samples.txt`; the learning curve and two-head heatmap
+are in `problem2/figures`.
 
-### 2.4 Analysis and ablations
+The head-count study compared 1, 4 and 8 heads at fixed width; parameter
+count remained 215,233 because the projected width was unchanged. The
+context study measured causal and unmasked forward passes for contexts
+64, 128, 256 and 512 and recorded peak CUDA memory. The observed growth is
+consistent with the `O(n^2 d)` attention score/memory term. Unmasked
+attention is treated only as an ablation, never as a valid causal LM.
 
-Use the saved heatmap figure to identify a local and a long-range head.
-Use `transformer_ablations.csv` for head count, `context_ablation.csv` for
-context length and memory, and the notebook output for causal versus
-unmasked behavior. Explain the `O(n^2 d)` attention-memory term and do not
-describe an unmasked training result as a valid causal language model.
+## 3. Reproducibility and AI-use statement
 
-## 3. AI-use statement
-
-AI assistance was used for code structuring, debugging, test design, plotting
-helpers, and report organization. The implementation was checked with the
-repository tests, and the reported experiment values were generated by the
-author's Colab T4 run and reconciled against the saved CSVs and notebook
-outputs. Any limitation or interrupted run is stated explicitly; no
-unexecuted result is presented as measured evidence.
+The full matrix was executed on a Colab Tesla T4 with PyTorch
+`2.14.1+cu130`, using seeds 42, 43 and 44. The repository tests pass
+(7 tests), and the generated CSVs/figures were copied from the completed
+runtime. AI assistance was used for code structuring, debugging, test design,
+plotting helpers and report organisation. All reported experiment values were
+generated by the author's T4 run; no unexecuted result is presented as
+measured evidence.
 
 ## References
 
 1. Hochreiter and Schmidhuber, “Long Short-Term Memory,” 1997.
-2. Cho et al., “Learning Phrase Representations using RNN Encoder-Decoder,”
-   2014.
+2. Cho et al., “Learning Phrase Representations using RNN Encoder-Decoder,” 2014.
 3. Vaswani et al., “Attention Is All You Need,” 2017.
 4. Anguita et al., UCI Human Activity Recognition Using Smartphones, 2013.
 5. Karpathy, Tiny Shakespeare dataset.

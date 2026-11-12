@@ -1,6 +1,51 @@
-Student: Souvik Dutta
-Student ID: 2026AJ05991
+Temperature 0.2
 
-Status: placeholder until the full Tiny Shakespeare training run completes.
-Generate the required 500-character samples with:
-python problem2/problem2.py --full
+
+HENRY BOLINGBROKE:
+I will not the rest of the for the father,
+And the state of the state of the father of the
+state the state the bear of the man of the breather.
+
+HENRY BOLINGBROKE:
+Why, is the service of the dead, the service of the king.
+
+KING RICHARD III:
+Then will not speak the sea to be the seasul of the sea,
+And when the send of the come of the country,
+And the world of the rest of the world of the sent
+That we shall be the father of the country of the sea
+To the world of the country of
+
+Temperature 0.8
+For Edward Murderer:
+Make nor scurves good him that cast,
+And not disposething not but water with for the death,
+They body present withal so much then markles,
+But good will he call be we known'd the way.
+
+KING EDWARD IV:
+I came one thou orest make to me they daughter,
+And that the come other your soul were itself,
+And noble part so with dew follow in the would
+Should be come agine of mine but acculate
+But him now he world with a dullef throws hath not
+Be anstroke, which come dead? The now she h
+
+Temperature 1.5
+
+To pule you; ask! ha! 'Foves thyself new-hat?
+
+POMPEY:
+God hymalice: pears: it, for of any downs with gue
+Sinly still Isp, you have not, you.' timeld sit,-word,
+Come pardle. Iblest him I, law favourd
+Thou doest laid I, as yourslable'd in femlow,
+Your heaety, home devod po my duke
+Savourding lublt lib moders otent datgchrace.
+MONTANGUE:
+Of you wisdable life house foot
+Spreach'd:
+Ay, not, more Isal said
+Do make banquilty wirse he sshool'd live. To trolm's fours:
+Believerty state purits a
+thing.

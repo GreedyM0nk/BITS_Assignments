@@ -100,10 +100,10 @@ def run_har_transformer(fast=True):
             })
             results.append((positional, seed, accuracy, macro_f1, count_parameters(model)))
     with (ROOT / "problem2" / "transformer_har_results.csv").open("w", encoding="utf-8") as handle:
-        handle.write("positional,seed,test_accuracy,params\n")
+        handle.write("positional,seed,test_accuracy,macro_f1,params\n")
         handle.writelines(
-            f"{positional},{seed},{accuracy},{params}\n"
-            for positional, seed, accuracy, _, params in results
+            f"{positional},{seed},{accuracy},{macro_f1},{params}\n"
+            for positional, seed, accuracy, macro_f1, params in results
         )
     return results
 
