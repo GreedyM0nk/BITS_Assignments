@@ -26,9 +26,20 @@ from the submission zip.
 
 The full configuration is intended for a T4 GPU and should be budgeted as a
 multi-hour reproducibility run because it includes repeated seeds and
-ablations. Every completed run appends to `results.csv`, so an interrupted
-session can be resumed. The generated samples are written to
-`problem2/generated_samples.txt`.
+ablations. Run the cells separately, in this order:
+
+1. Problem 1: `run_smoke()`, `run_har(False)`, `run_adding(False)`,
+   `run_gradient_study(False)`, `run_hidden_size_sweep(False)`, and
+   `run_clipping_ablation(False)`.
+2. Problem 2: `hand_check_attention()`, `run_har_transformer(False)`,
+   `run_transformer_ablations(False)`, `run_mask_and_context_ablation(False)`,
+   `train_language_model(False)`, `generate_samples(...)`, and the heatmap
+   cell.
+
+The experiment functions write their CSVs and figures into the assignment
+folder. If a cell is interrupted, inspect the existing files before rerunning
+it so that duplicate rows are not mistaken for independent seeds. The
+generated samples are written to `problem2/generated_samples.txt`.
 
 ## Reproducibility and assumptions
 
@@ -37,7 +48,8 @@ and statistics are fit on the training subjects only. The selected values are
 declared here and in the report title block, and must be retained when
 reproducing the results.
 
-The report must be completed from the generated tables and figures. The
-assignment's academic-integrity requirement is preserved in the report's
-AI-use statement. The current repository contains verified smoke evidence; full
-benchmark outputs must be generated on a T4 before submission.
+Complete `report.md` from the generated tables and figures, then export it as a
+maximum-six-page PDF. The assignment's academic-integrity requirement is
+preserved in the report's AI-use statement. The current repository contains
+verified code and tests; full benchmark outputs must be generated on a T4
+before submission.
