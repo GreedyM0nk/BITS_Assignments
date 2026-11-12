@@ -62,40 +62,46 @@ def plot_hand_check(path):
 
 
 def run_har_transformer(fast=True):
-    arrays = load_har(ROOT / "data", SETTINGS.seeds[0])
-    x_train, y_train, x_valid, y_valid, x_test, y_test = arrays[:6]
-    loaders = (
-        loaders_from_arrays(x_train, y_train),
-        loaders_from_arrays(x_valid, y_valid, shuffle=False),
-        loaders_from_arrays(x_test, y_test, shuffle=False),
-    )
     results = []
-    for positional in ("none", "sinusoidal", "learned"):
-        model = HARTransformerClassifier(positional=positional)
-        optimizer = torch.optim.Adam(model.parameters(), lr=SETTINGS.lr)
-        criterion = torch.nn.CrossEntropyLoss()
-        model.to(device())
-        epochs = 1 if fast else SETTINGS.epochs
-        for _ in range(epochs):
-            model.train()
-            for x, y in loaders[0]:
-                optimizer.zero_grad(set_to_none=True)
-                loss = criterion(model(x.to(device())), y.to(device()))
-                loss.backward()
-                optimizer.step()
-        model.eval()
-        truth, predictions = [], []
-        with torch.no_grad():
-            for x, y in loaders[2]:
-                predictions.extend(model(x.to(device())).argmax(-1).cpu().tolist())
-                truth.extend(y.tolist())
-        accuracy = sum(a == b for a, b in zip(truth, predictions)) / len(truth)
-        append_result(RESULTS, {
-            "problem": "P2-HAR", "model": f"Transformer-{positional}",
-            "seed": SETTINGS.seeds[0], "test_acc": accuracy,
-            "params": count_parameters(model), "notes": "CLS;positional ablation",
-        })
-        results.append((positional, accuracy, count_parameters(model)))
+    for seed in SETTINGS.seeds:
+        arrays = load_har(ROOT / "data", seed)
+        x_train, y_train, x_valid, y_valid, x_test, y_test = arrays[:6]
+        loaders = (
+            loaders_from_arrays(x_train, y_train),
+            loaders_from_arrays(x_valid, y_valid, shuffle=False),
+            loaders_from_arrays(x_test, y_test, shuffle=False),
+        )
+        for positional in ("none", "sinusoidal", "learned"):
+            model = HARTransformerClassifier(positional=positional).to(device())
+            optimizer = torch.optim.Adam(model.parameters(), lr=SETTINGS.lr)
+            criterion = torch.nn.CrossEntropyLoss()
+            epochs = 1 if fast else SETTINGS.epochs
+            for _ in range(epochs):
+                model.train()
+                for x, y in loaders[0]:
+                    optimizer.zero_grad(set_to_none=True)
+                    loss = criterion(model(x.to(device())), y.to(device()))
+                    loss.backward()
+                    optimizer.step()
+            model.eval()
+            truth, predictions = [], []
+            with torch.no_grad():
+                for x, y in loaders[2]:
+                    predictions.extend(model(x.to(device())).argmax(-1).cpu().tolist())
+                    truth.extend(y.tolist())
+            accuracy = sum(a == b for a, b in zip(truth, predictions)) / len(truth)
+            append_result(RESULTS, {
+                "problem": "P2-HAR", "model": f"Transformer-{positional}",
+                "seed": seed, "test_acc": accuracy,
+                "params": count_parameters(model), "notes": "CLS;positional ablation",
+            })
+            results.append((positional, seed, accuracy, count_parameters(model)))
+    with (ROOT / "problem2" / "transformer_har_results.csv").open("w", encoding="utf-8") as handle:
+        handle.write("positional,seed,test_accuracy,params\n")
+        handle.writelines(
+            f"{positional},{seed},{accuracy},{params}\n"
+            for positional, seed, accuracy, params in results
+        )
     return results
 
 
@@ -125,18 +131,22 @@ def run_transformer_ablations(fast=True):
             65, SETTINGS.transformer_dim, heads, 1, 128
         ).to(device())
         tokens = torch.randint(0, 65, (2, 128), device=device())
+        model.eval()
         start = torch.cuda.Event(enable_timing=True) if torch.cuda.is_available() else None
         if start:
             end = torch.cuda.Event(enable_timing=True)
+            torch.cuda.synchronize()
             start.record()
-            model(tokens)
+            with torch.no_grad():
+                model(tokens)
             end.record()
             torch.cuda.synchronize()
             elapsed = start.elapsed_time(end) / 1000
         else:
             import time
             begin = time.perf_counter()
-            model(tokens)
+            with torch.no_grad():
+                model(tokens)
             elapsed = time.perf_counter() - begin
         rows.append((heads, elapsed, count_parameters(model)))
     with (ROOT / "problem2" / "transformer_ablations.csv").open("w", encoding="utf-8") as handle:
@@ -156,11 +166,18 @@ def run_mask_and_context_ablation(fast=True):
         tokens = torch.randint(0, 65, (2, context), device=device())
         if torch.cuda.is_available():
             torch.cuda.reset_peak_memory_stats()
+            torch.cuda.synchronize()
         started = time.perf_counter()
-        causal_logits = model(tokens, causal=True)
+        with torch.no_grad():
+            causal_logits = model(tokens, causal=True)
+        if torch.cuda.is_available():
+            torch.cuda.synchronize()
         causal_seconds = time.perf_counter() - started
         started = time.perf_counter()
-        unmasked_logits = model(tokens, causal=False)
+        with torch.no_grad():
+            unmasked_logits = model(tokens, causal=False)
+        if torch.cuda.is_available():
+            torch.cuda.synchronize()
         unmasked_seconds = time.perf_counter() - started
         peak_memory = torch.cuda.max_memory_allocated() if torch.cuda.is_available() else 0
         rows.append((context, causal_seconds, unmasked_seconds, peak_memory,

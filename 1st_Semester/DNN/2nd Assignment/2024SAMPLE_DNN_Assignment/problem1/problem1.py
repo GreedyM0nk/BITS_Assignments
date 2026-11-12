@@ -134,22 +134,34 @@ def run_gradient_study(fast=FAST_MODE):
 
 def run_hidden_size_sweep(fast=FAST_MODE):
     sizes = (16, 32) if fast else (16, 32, 64, 128)
-    train, valid, test = har_loaders(SETTINGS.seeds[0])
     rows = []
-    for size in sizes:
-        for kind in ("LSTM", "GRU"):
-            result = train_classifier(
-                RecurrentClassifier(9, size, 6, kind), train, valid, test,
-                1 if fast else SETTINGS.epochs, SETTINGS.lr, device(), SETTINGS.seeds[0],
-            )
-            rows.append((size, kind, result["accuracy"], result["params"]))
-    frame = np.array([(size, acc) for size, _, acc, _ in rows])
+    for seed in SETTINGS.seeds:
+        train, valid, test = har_loaders(seed)
+        for size in sizes:
+            for kind in ("LSTM", "GRU"):
+                result = train_classifier(
+                    RecurrentClassifier(9, size, 6, kind), train, valid, test,
+                    1 if fast else SETTINGS.epochs, SETTINGS.lr, device(), seed,
+                )
+                rows.append((size, kind, seed, result["accuracy"], result["params"]))
     plt.figure(figsize=(6, 4))
     for kind in ("LSTM", "GRU"):
-        subset = [(s, a) for s, k, a, _ in rows if k == kind]
-        plt.plot([x[0] for x in subset], [x[1] for x in subset], marker="o", label=kind)
+        means = []
+        errors = []
+        for size in sizes:
+            values = [accuracy for s, k, _, accuracy, _ in rows
+                      if s == size and k == kind]
+            means.append(np.mean(values))
+            errors.append(np.std(values, ddof=1) if len(values) > 1 else 0.0)
+        plt.errorbar(sizes, means, yerr=errors, marker="o", capsize=3, label=kind)
+    with (ROOT / "problem1" / "hidden_size_sweep.csv").open("w", encoding="utf-8") as handle:
+        handle.write("hidden_size,model,seed,test_accuracy,params\n")
+        handle.writelines(
+            f"{size},{kind},{seed},{accuracy},{params}\n"
+            for size, kind, seed, accuracy, params in rows
+        )
     plt.xlabel("Hidden size")
-    plt.ylabel("HAR test accuracy")
+    plt.ylabel("HAR test accuracy (mean +/- sample std)")
     plt.title("Figure 4. Hidden-size sweep")
     plt.legend()
     plt.tight_layout()
@@ -160,17 +172,22 @@ def run_hidden_size_sweep(fast=FAST_MODE):
 
 
 def run_clipping_ablation(fast=FAST_MODE):
-    loaders = build_adding_loaders(200, fast=fast)
     rows = []
-    for clipping in (None, 1.0):
-        result = train_regressor(
-            RecurrentRegressor(2, SETTINGS.hidden_size, "RNN"), *loaders,
-            1 if fast else SETTINGS.epochs, SETTINGS.lr, device(),
-            SETTINGS.seeds[0], clip=clipping,
-        )
-        rows.append((clipping or "none", result["test_mse"]))
+    for seed in SETTINGS.seeds:
+        loaders = build_adding_loaders(200, fast=fast)
+        for clipping in (None, 1.0):
+            result = train_regressor(
+                RecurrentRegressor(2, SETTINGS.hidden_size, "RNN"), *loaders,
+                1 if fast else SETTINGS.epochs, SETTINGS.lr, device(),
+                seed, clip=clipping,
+            )
+            rows.append((clipping or "none", seed, result["test_mse"]))
     plt.figure(figsize=(5, 3))
-    plt.bar([str(x[0]) for x in rows], [x[1] for x in rows])
+    labels = ("none", "1.0")
+    means = [np.mean([mse for label, _, mse in rows if label == name]) for name in labels]
+    errors = [np.std([mse for label, _, mse in rows if label == name], ddof=1)
+              for name in labels]
+    plt.bar(labels, means, yerr=errors, capsize=3)
     plt.axhline(0.167, color="red", linestyle="--", label="constant baseline")
     plt.ylabel("Test MSE")
     plt.title("Figure 5. RNN gradient-clipping ablation at T=200")
@@ -179,6 +196,9 @@ def run_clipping_ablation(fast=FAST_MODE):
     FIGURES_1.mkdir(parents=True, exist_ok=True)
     plt.savefig(FIGURES_1 / "p1_clipping_ablation.png", dpi=160)
     plt.close()
+    with (ROOT / "problem1" / "clipping_ablation.csv").open("w", encoding="utf-8") as handle:
+        handle.write("clipping,seed,test_mse\n")
+        handle.writelines(f"{label},{seed},{mse}\n" for label, seed, mse in rows)
     return rows
 
 
