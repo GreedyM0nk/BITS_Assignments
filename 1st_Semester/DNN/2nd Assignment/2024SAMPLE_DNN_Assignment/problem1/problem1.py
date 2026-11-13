@@ -185,9 +185,12 @@ def run_clipping_ablation(fast=FAST_MODE):
             rows.append((clipping or "none", seed, result["test_mse"]))
     plt.figure(figsize=(5, 3))
     labels = ("none", "1.0")
-    means = [np.mean([mse for label, _, mse in rows if label == name]) for name in labels]
-    errors = [np.std([mse for label, _, mse in rows if label == name], ddof=1)
-              for name in labels]
+    grouped = {
+        name: [mse for label, _, mse in rows if str(label) == name]
+        for name in labels
+    }
+    means = [np.mean(grouped[name]) for name in labels]
+    errors = [np.std(grouped[name], ddof=1) for name in labels]
     plt.bar(labels, means, yerr=errors, capsize=3)
     plt.axhline(0.167, color="red", linestyle="--", label="constant baseline")
     plt.ylabel("Test MSE")
