@@ -112,7 +112,11 @@ def plot_attention_heatmaps(model, tokens, path):
     model.eval()
     x = model.embedding(tokens)
     x = model.position(x)
-    _, weights = model.blocks[0](x, return_weights=True)
+    steps = tokens.size(1)
+    causal_mask = torch.tril(
+        torch.ones(steps, steps, device=tokens.device, dtype=torch.bool)
+    )
+    _, weights = model.blocks[0](x, mask=causal_mask, return_weights=True)
     FIGURES_2.mkdir(parents=True, exist_ok=True)
     fig, axes = plt.subplots(1, 2, figsize=(8, 3))
     for index, axis in enumerate(axes):
