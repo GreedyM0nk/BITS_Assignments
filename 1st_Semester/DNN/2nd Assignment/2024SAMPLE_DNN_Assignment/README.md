@@ -61,8 +61,40 @@ and statistics are fit on the training subjects only. The selected values are
 declared here and in the report title block, and must be retained when
 reproducing the results.
 
-Complete `report.md` from the generated tables and figures, then export it as a
-maximum-six-page PDF. The assignment's academic-integrity requirement is
-preserved in the report's AI-use statement. The current repository contains
-verified code and tests; full benchmark outputs must be generated on a T4
-before submission.
+## Measured T4 runtime
+
+The submitted executed notebooks report the following elapsed times on a
+Tesla T4 with PyTorch `2.14.1+cu130`:
+
+- Problem 1: HAR 40.86 s, adding 128.47 s, gradients 9.76 s,
+  hidden-size sweep 74.43 s, clipping ablation 21.15 s; total approximately
+  **274.68 s (4.58 minutes)**.
+- Problem 2: Transformer HAR 188.43 s, head ablation 0.14 s, context/no-mask
+  study 0.05 s, language model 109.30 s; total approximately
+  **297.92 s (4.97 minutes)**.
+
+These totals exclude data download and notebook startup time. GPU timing can
+vary slightly across Colab sessions.
+
+## Submission contents
+
+The ZIP contains both executed notebooks with saved outputs, source modules,
+tests, `results.csv`, generated CSV evidence, numbered figures, generated
+language-model samples, `report.pdf`, and this README. It excludes datasets,
+checkpoints, virtual environments, and Python cache files.
+
+## Other assumptions and limitations
+
+- The three-token attention example is the explicit Q/K/V example in the
+  report and notebook; its hand-computed scores, softmax weights, and output
+  are checked against the implementation.
+- The head ablation uses one encoder block, while the language model uses four
+  blocks. Therefore their parameter totals are not expected to match.
+- The selected individual ablation is RNN gradient clipping because the
+  instructor clarification withdrew the ID-based variants table. An optional
+  forget-gate-bias experiment is present but disabled unless course staff
+  confirms that the withdrawn rule should be reinstated.
+- The context/no-mask study is a forward-pass ablation only; unmasked
+  attention is not presented as a valid causal language model.
+- The report is limited to six pages and includes the AI-use statement required
+  by the assignment.
