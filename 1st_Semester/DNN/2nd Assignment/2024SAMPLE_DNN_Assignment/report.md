@@ -1,4 +1,4 @@
-# Deep Neural Networks - Programming Assignment 2
+﻿# Deep Neural Networks - Programming Assignment 2
 ## RNN, LSTM, GRU and Transformer
 
 **Name:** Souvik Dutta
@@ -85,9 +85,9 @@ The causal test verifies exact zero probability above the diagonal.
 
 | Positional mode | Accuracy mean +/- sd | Macro-F1 mean +/- sd | Parameters |
 |---|---:|---:|---:|
-| None | 87.659 +/- 1.936% | 87.446 +/- 1.980% | 415,494 |
-| Sinusoidal | **89.445 +/- 1.240%** | **89.247 +/- 1.303%** | 415,494 |
-| Learned | 88.439 +/- 0.859% | 87.984 +/- 0.989% | 415,494 |
+| None | **89.164 +/- 1.163%** | **89.068 +/- 1.134%** | 415,494 |
+| Sinusoidal | 88.214 +/- 0.680% | 88.088 +/- 0.734% | 415,494 |
+| Learned | 88.542 +/- 1.196% | 88.368 +/- 1.241% | 415,494 |
 
 The sinusoidal Transformer is competitive with the GRU but is much larger,
 so the GRU remains preferable for a constrained wearable deployment.
@@ -96,7 +96,7 @@ so the GRU remains preferable for a constrained wearable deployment.
 
 The causal language model used context 128, width 128, four heads, four
 layers, and 12 epochs. It has 810,049 parameters. Validation loss decreased
-from 2.3461 to **1.5941 nats**, or **2.2998 bits per character**. Genuine
+from 2.3461 to **1.5990 nats**, or **2.3069 bits per character**. Genuine
 samples at temperatures 0.2, 0.8 and 1.5 are saved in
 `problem2/generated_samples.txt`; the learning curve and two-head heatmap
 are in `problem2/figures`.
@@ -104,7 +104,7 @@ are in `problem2/figures`.
 The head-count study compared 1, 4 and 8 heads at fixed width; parameter
 count remained 215,233 because it uses one Transformer block, whereas the
 four-block language model has 810,049 parameters. The encoder-block
-derivation is `4d² + 2*d*d_ff`; for `d=128`, `d_ff=512`, the weight-only
+derivation is `4dÂ² + 2*d*d_ff`; for `d=128`, `d_ff=512`, the weight-only
 term is 196,608, and the notebook compares the complete analytic total with
 `sum(p.numel())`.
 
@@ -114,7 +114,7 @@ The context study measured causal versus unmasked passes at contexts 64, 128,
 `(0.001327, 0.001055, 20.14 MB)`,
 `(0.001474, 0.001166, 24.37 MB)`, and
 `(0.001569, 0.001551, 39.25 MB)` for causal time, unmasked time and peak
-memory. The increase is consistent with the `O(n²d)` attention score/memory
+memory. The increase is consistent with the `O(nÂ²d)` attention score/memory
 term. Unmasked attention is treated only as an ablation, never as a valid
 causal language model. The heatmap shows local diagonal attention in one head
 and broader earlier-token attention in the other; future positions remain
@@ -132,9 +132,9 @@ measured evidence.
 
 ## References
 
-1. Hochreiter and Schmidhuber, “Long Short-Term Memory,” 1997.
-2. Cho et al., “Learning Phrase Representations using RNN Encoder-Decoder,” 2014.
-3. Vaswani et al., “Attention Is All You Need,” 2017.
+1. Hochreiter and Schmidhuber, â€œLong Short-Term Memory,â€ 1997.
+2. Cho et al., â€œLearning Phrase Representations using RNN Encoder-Decoder,â€ 2014.
+3. Vaswani et al., â€œAttention Is All You Need,â€ 2017.
 4. Anguita et al., UCI Human Activity Recognition Using Smartphones, 2013.
 5. Karpathy, Tiny Shakespeare dataset.
 6. PyTorch documentation for recurrent layers, attention, and optimizers.

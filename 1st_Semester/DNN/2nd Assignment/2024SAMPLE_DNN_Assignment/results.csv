@@ -53,4 +53,4 @@ P2-HAR,Transformer-learned,43,,0.8951476077366813,0.8940762099809626,,415494,,,,
 P2-HAR,Transformer-none,44,,0.9046487953851374,0.9031774290175444,,415494,,,,CLS;positional ablation
 P2-HAR,Transformer-sinusoidal,44,,0.8825924669155073,0.8824462506818206,,415494,,,,CLS;positional ablation
 P2-HAR,Transformer-learned,44,,0.8720732948761453,0.8699400098791067,,415494,,,,CLS;positional ablation
-P2-LM,CausalTransformer,42,,,,,810049,,1.6035678694811037,2.3134594066722634,context=128;heads=4
+P2-LM,CausalTransformer,42,,,,,810049,,1.598996157484586,2.30686382680352,context=128;heads=4;final T4 rerun
